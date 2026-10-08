@@ -33,7 +33,6 @@
     <h1>⚠️ Squad</h1>
     <div id="status-zpravy" class="loading">Načítám data ze základny... ⏳</div>
 
-    <!-- AKTIVNÍ BORDEL -->
     <div class="card">
         <h2>Aktivní Průšvihy 💩</h2>
         <p>Tyhle věci se tu aktuálně válí. Kdo to uklidí, může to odškrtnout.</p>
@@ -43,17 +42,15 @@
                     <th>Flákač</th>
                     <th>Co posral</th>
                     <th>Pokuta</th>
+                    <th>Práskač</th>
                     <th>Akce</th>
                 </tr>
             </thead>
-            <tbody id="aktivni-bordel-body">
-                <!-- Doplní JS -->
-            </tbody>
+            <tbody id="aktivni-bordel-body"></tbody>
         </table>
         <p id="zadny-bordel" class="empty-state">Všechno se leskne, žádný aktivní bordel! ✨</p>
     </div>
 
-    <!-- ROZPIS A KOLO OSUDU -->
     <div class="card">
         <h2>Kolo Osudu (Rozpis)</h2>
         <button id="btn-spin" disabled>Zatočit kolem osudu 🎲</button>
@@ -67,12 +64,24 @@
     <div class="grid">
         <div class="card">
             <h2>Nahlásit Bordel 🚨</h2>
+            <label>Kdo to posral?</label>
             <select id="bordel-kdo">
                 <option value="Hetik">Hetik</option><option value="Fajt">Fajt</option>
                 <option value="Simon">Simon</option><option value="TobySS">TobySS</option>
             </select>
+            
+            <label>Co přesně neudělal/posral?</label>
             <input type="text" id="bordel-co" placeholder="Např. neumytá pánev..." required>
+            
+            <label>Pokuta (Kč)</label>
             <input type="number" id="bordel-pokuta" placeholder="100" required>
+            
+            <label>Kdo to hlásí? (Práskač)</label>
+            <select id="bordel-praskac">
+                <option value="Hetik">Hetik</option><option value="Fajt">Fajt</option>
+                <option value="Simon">Simon</option><option value="TobySS">TobySS</option>
+            </select>
+
             <button id="btn-report" class="action" onclick="nahlasitBordel()" disabled>Udělit pokutu!</button>
         </div>
 
@@ -80,16 +89,14 @@
             <h2>Síň Hanby (Dluhy) 💸</h2>
             <table>
                 <thead><tr><th>Flákač</th><th>Dluží (Kč)</th></tr></thead>
-                <tbody id="dluhy-body">
-                    <!-- Tady se to načte automaticky přes JS seřazené -->
-                </tbody>
+                <tbody id="dluhy-body"></tbody>
             </table>
         </div>
     </div>
 </div>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxMFrxDyg2KKnZaUzbsGC3w5WW7v0YAon8tefKFNpyMfsdB7jDIEqPCpgmRSLYNFQ45/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrzkkfH-sh_GV1S2reZunBvDRd5bnbWAj0KyqWtKGLqzubxC3llzfZ5u6Zdtr0U6XK/exec";
     
     const lide = ["Hetik", "Fajt", "Simon", "TobySS"];
     const ukoly = ["Obývák", "Koupelna", "Záchod", "Kuchyň"];
@@ -105,19 +112,14 @@
         return array;
     }
 
-    // Funkce na vykreslení a seřazení dluhů
     function renderDluhy() {
         const tbody = document.getElementById("dluhy-body");
         tbody.innerHTML = "";
-        
-        // Převedeme dluhy na pole a seřadíme sestupně
-        let serazeneDluhy = lide.map(jmeno => ({ jmeno: jmeno, castka: dluhy[jmeno] }))
-                                .sort((a, b) => b.castka - a.castka);
+        let serazeneDluhy = lide.map(jmeno => ({ jmeno: jmeno, castka: dluhy[jmeno] })).sort((a, b) => b.castka - a.castka);
 
         serazeneDluhy.forEach((osoba, index) => {
-            let tr = document.createElement("tr");
-            // Lebka pro toho, kdo dluží nejvíc (a zároveň dluží víc než 0)
             let ikona = (index === 0 && osoba.castka > 0) ? " 💀" : "";
+            let tr = document.createElement("tr");
             tr.innerHTML = `<td>${osoba.jmeno}${ikona}</td><td>${osoba.castka} Kč</td>`;
             tbody.appendChild(tr);
         });
@@ -128,15 +130,9 @@
             const response = await fetch(SCRIPT_URL);
             const data = await response.json();
             
-            // 1. Dluhy
-            lide.forEach(clovek => {
-                if(data.dluhy[clovek] !== undefined) {
-                    dluhy[clovek] = data.dluhy[clovek];
-                }
-            });
-            renderDluhy(); // Zavoláme novou funkci pro vykreslení
+            lide.forEach(clovek => { if(data.dluhy[clovek] !== undefined) dluhy[clovek] = data.dluhy[clovek]; });
+            renderDluhy(); 
 
-            // 2. Rozpis
             const tbodyRozpis = document.getElementById("rozpis-body");
             tbodyRozpis.innerHTML = "";
             if(data.rozpis && data.rozpis.length > 0) {
@@ -150,7 +146,6 @@
                 });
             }
 
-            // 3. Aktivní bordel
             const tbodyBordel = document.getElementById("aktivni-bordel-body");
             tbodyBordel.innerHTML = "";
             if(data.aktivniBordel && data.aktivniBordel.length > 0) {
@@ -163,6 +158,7 @@
                         <td>${b.kdo}</td>
                         <td>${b.co}</td>
                         <td>${b.pokuta} Kč</td>
+                        <td>${b.nahlasil || "Neznámý"}</td>
                         <td><button class="action small" onclick="ukliditBordel(${b.row}, this)">Uklizeno 🧹</button></td>
                     `;
                     tbodyBordel.appendChild(tr);
@@ -177,25 +173,20 @@
             document.getElementById("status-zpravy").style.display = "none";
 
         } catch (error) {
-            console.error(error);
             document.getElementById("status-zpravy").innerText = "❌ Nepodařilo se spojit s databází.";
         }
     }
 
-    // Odškrtnutí bordelu
     async function ukliditBordel(rowId, btnElement) {
         btnElement.innerText = "⏳";
         btnElement.disabled = true;
-        
         try {
             await fetch(SCRIPT_URL, {
                 method: "POST",
                 headers: { "Content-Type": "text/plain" },
                 body: JSON.stringify({ action: "resolve_bordel", row: rowId })
             });
-            
             btnElement.closest("tr").remove();
-            
             const tbody = document.getElementById("aktivni-bordel-body");
             if(tbody.children.length === 0) {
                 document.getElementById("bordel-table").style.display = "none";
@@ -228,14 +219,12 @@
                 headers: { "Content-Type": "text/plain" },
                 body: JSON.stringify({ action: "spin", rozpis: novyRozpis })
             });
-
             tbody.innerHTML = "";
             novyRozpis.forEach(row => {
                 let tr = document.createElement("tr");
                 tr.innerHTML = `<td>${row.jmeno}</td><td>${row.ukol}</td>`;
                 tbody.appendChild(tr);
             });
-
             animaceDiv.innerText = "Úkoly rozdány! ⚔️";
             table.style.display = "table";
         } catch (error) {
@@ -249,6 +238,7 @@
         const kdo = document.getElementById("bordel-kdo").value;
         const co = document.getElementById("bordel-co").value;
         const pokuta = parseInt(document.getElementById("bordel-pokuta").value);
+        const nahlasil = document.getElementById("bordel-praskac").value;
 
         if(!co || isNaN(pokuta)) return alert("Vyplň co udělal a platnou částku pokuty!");
 
@@ -260,26 +250,4 @@
             await fetch(SCRIPT_URL, {
                 method: "POST",
                 headers: { "Content-Type": "text/plain" },
-                body: JSON.stringify({ action: "report", kdo: kdo, co: co, pokuta: pokuta })
-            });
-
-            // Přičteme dluh do objektu
-            dluhy[kdo] += pokuta;
-            
-            alert(`🚨 ${kdo} dluží ${pokuta} Kč za: ${co}.`);
-            // Reloadem stránky se znovu načtou z Google Sheetu a korektně seřadí
-            location.reload(); 
-            
-        } catch (error) {
-            alert("❌ Chyba při ukládání.");
-            btn.innerText = "Udělit pokutu!";
-            btn.disabled = false;
-        }
-    }
-
-    // Spuštění po načtení
-    window.onload = loadData;
-
-</script>
-</body>
-</html>
+                body: JSON.stringify({ action: "
