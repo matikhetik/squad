@@ -14,18 +14,22 @@
         button:active { box-shadow: 0px 0px 0px #000; transform: translate(4px, 4px); }
         button:disabled { background-color: #7f8fa6; box-shadow: 0px 0px 0px #000; transform: translate(4px, 4px); cursor: not-allowed; }
         button.action { background-color: var(--accent); color: #000; }
-        button.small { font-size: 0.85rem; padding: 6px 8px; box-shadow: 2px 2px 0px #000; width: auto; }
+        button.small { font-size: 1rem; padding: 6px 10px; box-shadow: 2px 2px 0px #000; width: auto; }
         button.small:active { transform: translate(2px, 2px); }
         .grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
         @media (min-width: 600px) { .grid { grid-template-columns: 1fr 1fr; } button { width: auto; } }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; word-break: break-word; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; }
         th, td { border: var(--border); padding: 8px; text-align: left; }
         th { background: #000; color: #fff; font-size: 0.85rem; }
+        .nowrap { white-space: nowrap; }
         input, select { width: 100%; padding: 10px; border: var(--border); box-sizing: border-box; font-family: inherit; font-weight: bold; margin-bottom: 15px; font-size: 1rem; background: #fff; }
         label { display: block; margin-bottom: 5px; font-size: 0.9rem; }
         .losovani-animace { font-size: 1.3rem; text-align: center; margin: 15px 0; color: var(--primary); }
         .loading { text-align: center; color: #576574; font-size: 1.1rem; margin-bottom: 15px; }
         .empty-state { text-align: center; font-style: italic; color: #555; margin-top: 15px; }
+        .praskac-note { font-size: 0.75rem; color: #555; margin-top: 4px; font-style: normal; }
+        .done-text { text-decoration: line-through; color: #7f8fa6; }
+        .done-label { color: var(--accent); font-size: 0.9rem; }
     </style>
 </head>
 <body>
@@ -41,9 +45,8 @@
             <thead>
                 <tr>
                     <th>Flákač</th>
-                    <th>Co</th>
-                    <th>Kč</th>
-                    <th>Práskač</th>
+                    <th>Co posral</th>
+                    <th>Pokuta</th>
                     <th>Akce</th>
                 </tr>
             </thead>
@@ -57,7 +60,7 @@
         <button id="btn-spin" disabled>Zatočit kolem osudu 🎲</button>
         <div id="animace" class="losovani-animace"></div>
         <table id="rozpis-table" style="display:none;">
-            <thead><tr><th>Jméno</th><th>Zóna smrti (Úkol)</th></tr></thead>
+            <thead><tr><th>Jméno</th><th>Úkol</th><th>Stav</th></tr></thead>
             <tbody id="rozpis-body"></tbody>
         </table>
     </div>
@@ -97,9 +100,8 @@
 </div>
 
 <script>
-    console.log("KROK 1: Skript se úspěšně načetl!");
-
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKX3iMsYAv6aNioeIrRoQig7bogQXetM2A-t7oQLZbvdUGkGl5gMSDL2YFrnq6kG97/exec";
+    // SEM VLOŽ NOVOU URL Z GOOGLE APPS SCRIPTU
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz0Y44TKIU2U8RwKNMyuEThpPRjkk8V8gNutyEH8-y-Q4nB_ARK8gmX2eqbjk-LKEUG/exec";
     
     const lide = ["Hetik", "Fajt", "Simon", "TobySS"];
     const ukoly = ["Obývák", "Koupelna", "Záchod", "Kuchyň"];
@@ -129,16 +131,9 @@
     }
 
     async function loadData() {
-        console.log("KROK 3: Spouští se funkce loadData, jdu volat Google...");
         try {
-            const fetchUrl = SCRIPT_URL + "?t=" + new Date().getTime();
-            console.log("KROK 4: Volám tuto adresu:", fetchUrl);
-            
-            const response = await fetch(fetchUrl);
-            console.log("KROK 5: Google odpověděl! Zpracovávám JSON...");
-            
+            const response = await fetch(SCRIPT_URL + "?t=" + new Date().getTime());
             const data = await response.json();
-            console.log("KROK 6: Přijatá data:", data);
             
             if (data.chyba_serveru) {
                 alert("Chyba ze serveru: " + data.chyba_serveru);
@@ -156,7 +151,16 @@
                 data.rozpis.forEach(row => {
                     if(row.jmeno && row.ukol) {
                         let tr = document.createElement("tr");
-                        tr.innerHTML = `<td>${row.jmeno}</td><td>${row.ukol}</td>`;
+                        let ukolTrida = row.hotovo ? "done-text" : "";
+                        let btnHtml = row.hotovo ? 
+                            `<span class="done-label">✔️ Hotovo</span>` : 
+                            `<button class="action small" onclick="ukliditUkol('${row.jmeno}', this)">✔️</button>`;
+                        
+                        tr.innerHTML = `
+                            <td>${row.jmeno}</td>
+                            <td class="${ukolTrida}">${row.ukol}</td>
+                            <td style="text-align: center;">${btnHtml}</td>
+                        `;
                         tbodyRozpis.appendChild(tr);
                     }
                 });
@@ -171,11 +175,13 @@
                 data.aktivniBordel.forEach(b => {
                     let tr = document.createElement("tr");
                     tr.innerHTML = `
-                        <td>${b.kdo}</td>
-                        <td>${b.co}</td>
-                        <td>${b.pokuta}</td>
-                        <td>${b.nahlasil || "Neznámý"}</td>
-                        <td><button class="action small" onclick="ukliditBordel(${b.row}, this)">🧹</button></td>
+                        <td class="nowrap">${b.kdo}</td>
+                        <td>
+                            ${b.co}
+                            <div class="praskac-note">🕵️ Nahlásil: ${b.nahlasil || "Neznámý"}</div>
+                        </td>
+                        <td class="nowrap">${b.pokuta} Kč</td>
+                        <td style="text-align: center;"><button class="action small" onclick="ukliditBordel(${b.row}, this)">🧹</button></td>
                     `;
                     tbodyBordel.appendChild(tr);
                 });
@@ -187,11 +193,10 @@
             document.getElementById("btn-spin").disabled = false;
             document.getElementById("btn-report").disabled = false;
             document.getElementById("status-zpravy").style.display = "none";
-            console.log("KROK 7: Všechno se úspěšně načetlo a zobrazilo.");
 
         } catch (error) {
-            console.error("CRASH: Něco selhalo během načítání dat!", error);
             document.getElementById("status-zpravy").innerText = "❌ Nepodařilo se spojit s databází.";
+            console.error(error);
         }
     }
 
@@ -213,6 +218,26 @@
         } catch(error) {
             alert("❌ Chyba při uklízení!");
             btnElement.innerText = "🧹";
+            btnElement.disabled = false;
+        }
+    }
+
+    // Nová funkce pro odškrtnutí úkolu
+    async function ukliditUkol(jmeno, btnElement) {
+        btnElement.innerText = "⏳";
+        btnElement.disabled = true;
+        try {
+            await fetch(SCRIPT_URL, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain" },
+                body: JSON.stringify({ action: "resolve_ukol", jmeno: jmeno })
+            });
+            // Přeškrtneme úkol a změníme tlačítko na text
+            btnElement.closest("tr").children[1].classList.add("done-text");
+            btnElement.outerHTML = '<span class="done-label">✔️ Hotovo</span>';
+        } catch(error) {
+            alert("❌ Chyba při ukládání stavu úkolu!");
+            btnElement.innerText = "✔️";
             btnElement.disabled = false;
         }
     }
@@ -240,7 +265,11 @@
             tbody.innerHTML = "";
             novyRozpis.forEach(row => {
                 let tr = document.createElement("tr");
-                tr.innerHTML = `<td>${row.jmeno}</td><td>${row.ukol}</td>`;
+                tr.innerHTML = `
+                    <td>${row.jmeno}</td>
+                    <td>${row.ukol}</td>
+                    <td style="text-align: center;"><button class="action small" onclick="ukliditUkol('${row.jmeno}', this)">✔️</button></td>
+                `;
                 tbody.appendChild(tr);
             });
             animaceDiv.innerText = "Úkoly rozdány! ⚔️";
@@ -280,11 +309,7 @@
         }
     }
 
-    // Nový, spolehlivější způsob spuštění při startu webu
-    document.addEventListener("DOMContentLoaded", () => {
-        console.log("KROK 2: HTML je vykresleno, spouštím proces...");
-        loadData();
-    });
+    document.addEventListener("DOMContentLoaded", loadData);
 
 </script>
 </body>
