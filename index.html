@@ -96,7 +96,8 @@
 </div>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrzkkfH-sh_GV1S2reZunBvDRd5bnbWAj0KyqWtKGLqzubxC3llzfZ5u6Zdtr0U6XK/exec";
+    // Tvoje aktuální adresa z Google Apps Scriptu
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKX3iMsYAv6aNioeIrRoQig7bogQXetM2A-t7oQLZbvdUGkGl5gMSDL2YFrnq6kG97/exec";
     
     const lide = ["Hetik", "Fajt", "Simon", "TobySS"];
     const ukoly = ["Obývák", "Koupelna", "Záchod", "Kuchyň"];
@@ -228,7 +229,7 @@
             animaceDiv.innerText = "Úkoly rozdány! ⚔️";
             table.style.display = "table";
         } catch (error) {
-            animaceDiv.innerText = "❌ Chyba při ukládání!";
+            animaceDiv.innerText = "❌ Chyba při uklízení!";
         } finally {
             btn.disabled = false;
         }
@@ -250,4 +251,19 @@
             await fetch(SCRIPT_URL, {
                 method: "POST",
                 headers: { "Content-Type": "text/plain" },
-                body: JSON.stringify({ action: "
+                body: JSON.stringify({ action: "report", kdo: kdo, co: co, pokuta: pokuta, nahlasil: nahlasil })
+            });
+            dluhy[kdo] += pokuta;
+            alert(`🚨 ${nahlasil} nabonzoval(a) ${kdo}. Ten dluží dalších ${pokuta} Kč za: ${co}.`);
+            location.reload(); 
+        } catch (error) {
+            alert("❌ Chyba při uklízení.");
+            btn.innerText = "Udělit pokutu!";
+            btn.disabled = false;
+        }
+    }
+
+    window.onload = loadData;
+</script>
+</body>
+</html>
