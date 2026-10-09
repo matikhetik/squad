@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Squad Ankety</title>
+    <style>
+        :root { --bg: #e0e5ec; --text: #1a1a1a; --primary: #9b59b6; --accent: #2ed573; --danger: #ff4757; --border: 4px solid #000; }
+        body { font-family: 'Courier New', Courier, monospace; background-color: var(--bg); color: var(--text); margin: 0; padding: 15px; font-weight: bold; }
+        h1, h2 { text-transform: uppercase; margin-top: 0; }
+        h1 { border-bottom: var(--border); padding-bottom: 8px; font-size: 1.4rem; }
+        .container { max-width: 800px; margin: 0 auto; position: relative; }
+        
+        .card { background: #fff; border: var(--border); padding: 15px; margin-bottom: 20px; box-shadow: 6px 6px 0px #000; }
+        .card.history { background: #dcdde1; color: #555; border: 4px solid #555; box-shadow: 6px 6px 0px #555; }
+        
+        input { width: 100%; padding: 10px; border: var(--border); box-sizing: border-box; font-family: inherit; font-weight: bold; margin-bottom: 10px; font-size: 1rem; background: #fff; }
+        label { display: block; margin-bottom: 5px; font-size: 0.9rem; margin-top: 10px;}
+        
+        button { background-color: var(--primary); color: white; border: var(--border); padding: 10px 15px; font-size: 1.1rem; cursor: pointer; font-weight: bold; text-transform: uppercase; box-shadow: 4px 4px 0px #000; transition: all 0.1s; width: 100%; margin-bottom: 5px; }
+        button:active { box-shadow: 0px 0px 0px #000; transform: translate(4px, 4px); }
+        button.action { background-color: var(--accent); color: #000; }
+        
+        /* Hlasovací tlačítka */
+        .vote-btn { background-color: #fff; color: #000; display: flex; justify-content: space-between; text-transform: none; text-align: left; }
+        .vote-btn.active { background-color: var(--accent); color: #000; }
+        
+        .fab { position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; border-radius: 50%; background: var(--primary); color: white; font-size: 2rem; border: var(--border); box-shadow: 4px 4px 0px #000; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 100; transition: transform 0.1s; }
+        .fab:active { box-shadow: 0px 0px 0px #000; transform: translate(4px, 4px); }
+
+        #form-anketa { display: none; margin-bottom: 30px; background: #f1f2f6; }
+        .loading { text-align: center; color: #576574; font-size: 1.1rem; margin-bottom: 15px; }
+        .separator { border-top: 4px solid #000; margin: 40px 0 20px 0; }
+        
+        .anketa-title { font-size: 1.2rem; margin-bottom: 5px; }
+        .anketa-meta { font-size: 0.8rem; color: #555; margin-bottom: 15px; }
+        .vote-count { font-size: 0.9rem; font-weight: normal; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <a href="index.html" style="display: inline-block; margin-bottom: 15px; color: #000; text-decoration: none; border-bottom: 2px solid #000; font-size: 1.1rem;">⬅ Zpět na základnu</a>
+    
+    <h1>📊 Hlasování & Ankety</h1>
+    <div id="status-zpravy" class="loading">Načítám ankety... ⏳</div>
+
+    <div class="fab" onclick="toggleForm()" id="btn-add">+</div>
+
+    <!-- Formulář -->
+    <div class="card" id="form-anketa">
+        <h2>Nová anketa</h2>
+        <label>Otázka (O čem se hlasuje?)</label>
+        <input type="text" id="ank-otazka" placeholder="Např. Jakou pizzu vezmeme?" required>
+        
+        <label>Možnosti (Vyplň min. 2)</label>
+        <input type="text" id="ank-m1" class="ank-moznost" placeholder="Možnost 1 (Např. Sýrová)">
+        <input type="text" id="ank-m2" class="ank-moznost" placeholder="Možnost 2 (Např. Šunková)">
+        <input type="text" id="ank-m3" class="ank-moznost" placeholder="Možnost 3 (volitelné)">
+        <input type="text" id="ank-m4" class="ank-moznost" placeholder="Možnost 4 (volitelné)">
+        
+        <button id="btn-save" class="action" onclick="vytvoritAnketu()" style="margin-top: 15px;">Zahájit hlasování</button>
+    </div>
+
+    <!-- Seznam aktivních -->
+    <div id="seznam-aktivni"></div>
+    
+    <div class="separator"></div>
+    <h2>📜 Historie anket</h2>
+    <div id="seznam-historie"></div>
+</div>
+
+<script>
+    // ZDE VLOŽ SVOU NOVOU URL ADRESU Z GOOGLU!
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwHqrROp3-eezWmTDnA_LRRHYDnr-Eisr-859fV9J7GMXpHMC4y8Kec-4qbJzftguLa/exec"; 
+    
+    const loggedInUser = localStorage.getItem('squad_user');
+    if (!loggedInUser) window.location.href = "index.html";
+
+    function toggleForm() {
+        const form = document.getElementById("form-anketa");
+        const btnAdd = document.getElementById("btn-add");
+        if (form.style.display === "block") {
+            form.style.display = "none";
+            btnAdd.innerHTML = "+"; btnAdd.style.background = "var(--primary)";
+        } else {
+            form.style.display = "block";
+            btnAdd.innerHTML = "✖"; btnAdd.style.background = "var(--danger)";
+        }
+    }
+
+    async function loadData() {
+        try {
+            const response = await fetch(SCRIPT_URL + "?t=" + new Date().getTime());
+            const data = await response.json();
+            
+            const seznamAktivni = document.getElementById("seznam-aktivni");
+            const seznamHistorie = document.getElementById("seznam-historie");
+            seznamAktivni.innerHTML = ""; seznamHistorie.innerHTML = "";
+            let aktivniCount = 0;
+
+            if(data.ankety && data.ankety.length > 0) {
+                data.ankety.forEach(anketa => {
+                    let totalVotes = Object.keys(anketa.hlasy).length;
+                    let myVote = anketa.hlasy[loggedInUser];
+                    let isCreator = anketa.vytvoril === loggedInUser;
+                    
+                    let htmlMoznosti = "";
+                    anketa.moznosti.forEach(moznost => {
+                        // Výpočet hlasů pro danou možnost
+                        let count = Object.values(anketa.hlasy).filter(v => v === moznost).length;
+                        
+                        if (anketa.stav === "Aktivní") {
+                            let activeClass = (myVote === moznost) ? "active" : "";
+                            htmlMoznosti += `<button class="vote-btn ${activeClass}" onclick="hlasovat('${anketa.id}', '${moznost}', this)">
+                                <span>${moznost}</span> <span class="vote-count">${count} hlasů</span>
+                            </button>`;
+                        } else {
+                            htmlMoznosti += `<div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px dashed #555; padding-bottom:4px;">
+                                <span>${moznost}</span> <b>${count} hlasů</b>
+                            </div>`;
+                        }
+                    });
+
+                    let card = document.createElement("div");
+                    if (anketa.stav === "Ukončeno") {
+                        card.className = "card history";
+                        card.innerHTML = `
+                            <div class="anketa-title">${anketa.otazka}</div>
+                            <div class="anketa-meta">Vytvořil: ${anketa.vytvoril} | Celkem hlasů: ${totalVotes}</div>
+                            ${htmlMoznosti}
+                        `;
+                        seznamHistorie.appendChild(card);
+                    } else {
+                        aktivniCount++;
+                        card.className = "card";
+                        let ukonceniHtml = isCreator ? `<div style="margin-top:15px; text-align:right;"><button class="small" style="background:var(--danger); color:white; width:auto;" onclick="ukoncitAnketu('${anketa.id}')">🛑 Ukončit anketu</button></div>` : "";
+                        
+                        card.innerHTML = `
+                            <div class="anketa-title">🤔 ${anketa.otazka}</div>
+                            <div class="anketa-meta">Vytvořil: ${anketa.vytvoril} | Tvoje volba: <b>${myVote || "Zatím nehlasováno"}</b></div>
+                            ${htmlMoznosti}
+                            ${ukonceniHtml}
+                        `;
+                        seznamAktivni.appendChild(card);
+                    }
+                });
+            }
+            
+            if(aktivniCount === 0) seznamAktivni.innerHTML = "<p style='text-align:center;'>Momentálně se o ničem nehlasuje.</p>";
+            if(seznamHistorie.innerHTML === "") seznamHistorie.innerHTML = "<p style='text-align:center;'>Historie je prázdná.</p>";
+            
+            document.getElementById("status-zpravy").style.display = "none";
+        } catch (error) { document.getElementById("status-zpravy").innerText = "❌ Nepodařilo se načíst ankety."; }
+    }
+
+    async function vytvoritAnketu() {
+        const otazka = document.getElementById("ank-otazka").value;
+        const m1 = document.getElementById("ank-m1").value;
+        const m2 = document.getElementById("ank-m2").value;
+        const m3 = document.getElementById("ank-m3").value;
+        const m4 = document.getElementById("ank-m4").value;
+
+        if(!otazka || !m1 || !m2) return alert("Vyplň otázku a aspoň první dvě možnosti!");
+
+        const btn = document.getElementById("btn-save");
+        btn.innerText = "Zakládám... ⏳"; btn.disabled = true;
+
+        try {
+            await fetch(SCRIPT_URL, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "create_anketa", otazka: otazka, moznosti: [m1, m2, m3, m4], vytvoril: loggedInUser }) });
+            location.reload(); 
+        } catch (error) { alert("❌ Chyba při vytváření."); btn.innerText = "Zahájit hlasování"; btn.disabled = false; }
+    }
+
+    async function hlasovat(id, volba, btnElement) {
+        // Vizuální přepnutí tlačítek
+        let buttons = btnElement.parentElement.querySelectorAll('.vote-btn');
+        buttons.forEach(b => b.classList.remove('active'));
+        btnElement.classList.add('active');
+
+        try {
+            await fetch(SCRIPT_URL, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "vote_anketa", id: id, volba: volba, jmeno: loggedInUser }) });
+            location.reload(); // Pro přepočítání čísel to refreshneme
+        } catch (error) { alert("❌ Chyba!"); }
+    }
+
+    async function ukoncitAnketu(id) {
+        if(!confirm("Opravdu chceš anketu ukončit a vyhlásit výsledky?")) return;
+        try {
+            await fetch(SCRIPT_URL, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "close_anketa", id: id }) });
+            location.reload(); 
+        } catch (error) { alert("❌ Chyba!"); }
+    }
+
+    document.addEventListener("DOMContentLoaded", loadData);
+</script>
+</body>
+</html>

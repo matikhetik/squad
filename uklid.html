@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Squad Uklid</title>
+    <style>
+        :root { --bg: #e0e5ec; --text: #1a1a1a; --primary: #ff4757; --accent: #2ed573; --border: 4px solid #000; }
+        body { font-family: 'Courier New', Courier, monospace; background-color: var(--bg); color: var(--text); margin: 0; padding: 15px; font-weight: bold; }
+        h1, h2 { text-transform: uppercase; border-bottom: var(--border); padding-bottom: 8px; margin-top: 0; font-size: 1.4rem; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: #fff; border: var(--border); padding: 15px; margin-bottom: 25px; box-shadow: 6px 6px 0px #000; overflow-x: auto; }
+        button { background-color: var(--primary); color: white; border: var(--border); padding: 10px 15px; font-size: 1.1rem; cursor: pointer; font-weight: bold; text-transform: uppercase; box-shadow: 4px 4px 0px #000; transition: all 0.1s; width: 100%; }
+        button:active { box-shadow: 0px 0px 0px #000; transform: translate(4px, 4px); }
+        button:disabled { background-color: #7f8fa6; box-shadow: 0px 0px 0px #000; transform: translate(4px, 4px); cursor: not-allowed; }
+        button.action { background-color: var(--accent); color: #000; }
+        button.small { font-size: 1rem; padding: 6px 10px; box-shadow: 2px 2px 0px #000; width: auto; }
+        button.small:active { transform: translate(2px, 2px); }
+        .grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        @media (min-width: 600px) { .grid { grid-template-columns: 1fr 1fr; } button { width: auto; } }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; }
+        th, td { border: var(--border); padding: 8px; text-align: left; }
+        th { background: #000; color: #fff; font-size: 0.85rem; }
+        .nowrap { white-space: nowrap; }
+        input, select { width: 100%; padding: 10px; border: var(--border); box-sizing: border-box; font-family: inherit; font-weight: bold; margin-bottom: 15px; font-size: 1rem; background: #fff; }
+        label { display: block; margin-bottom: 5px; font-size: 0.9rem; }
+        .losovani-animace { font-size: 1.3rem; text-align: center; margin: 15px 0; color: var(--primary); }
+        .loading { text-align: center; color: #576574; font-size: 1.1rem; margin-bottom: 15px; }
+        .empty-state { text-align: center; font-style: italic; color: #555; margin-top: 15px; }
+        .praskac-note { font-size: 0.75rem; color: #555; margin-top: 4px; font-style: normal; }
+        .done-text { text-decoration: line-through; color: #7f8fa6; }
+        .done-label { color: var(--accent); font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <a href="index.html" style="display: inline-block; margin-bottom: 15px; color: #000; text-decoration: none; border-bottom: 2px solid #000; font-size: 1.1rem;">⬅ Zpět na základnu</a>
+    
+    <h1>⚠️ Squad Úklid</h1>
+    <div id="status-zpravy" class="loading">Načítám data ze základny... ⏳</div>
+
+    <div class="card">
+        <h2>Aktivní Průšvihy 💩</h2>
+        <table id="bordel-table" style="display:none;">
+            <thead><tr><th>Flákač</th><th>Co posral</th><th>Kč</th><th>Akce</th></tr></thead>
+            <tbody id="aktivni-bordel-body"></tbody>
+        </table>
+        <p id="zadny-bordel" class="empty-state">Všechno se leskne, žádný aktivní bordel! ✨</p>
+    </div>
+
+    <div class="card">
+        <h2>Kolo Osudu (Rozpis)</h2>
+        <button id="btn-spin" disabled>Zatočit kolem osudu 🎲</button>
+        <div id="animace" class="losovani-animace"></div>
+        <table id="rozpis-table" style="display:none;">
+            <thead><tr><th>Jméno</th><th>Úkol</th><th>Stav</th></tr></thead>
+            <tbody id="rozpis-body"></tbody>
+        </table>
+    </div>
+
+    <div class="grid">
+        <!-- Zde přidáno ID pro skrytí celého bloku před návštěvou -->
+        <div id="guest-hide-report" class="card">
+            <h2>Nahlásit Bordel 🚨</h2>
+            <label>Kdo to posral?</label>
+            <select id="bordel-kdo">
+                <option value="Hetik">Hetik</option><option value="Fajt">Fajt</option>
+                <option value="Simon">Simon</option><option value="TobySS">TobySS</option>
+            </select>
+            
+            <label>Co přesně neudělal/posral?</label>
+            <input type="text" id="bordel-co" placeholder="Např. neumytá pánev..." required>
+            
+            <label>Pokuta (Kč)</label>
+            <input type="number" id="bordel-pokuta" placeholder="100" required>
+            
+            <button id="btn-report" class="action" onclick="nahlasitBordel()" disabled>Udělit pokutu!</button>
+        </div>
+
+        <div class="card">
+            <h2>Síň Hanby (Dluhy) 💸</h2>
+            <table>
+                <thead><tr><th>Flákač</th><th>Dluží</th></tr></thead>
+                <tbody id="dluhy-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwHqrROp3-eezWmTDnA_LRRHYDnr-Eisr-859fV9J7GMXpHMC4y8Kec-4qbJzftguLa/exec"; 
+    
+    const loggedInUser = localStorage.getItem('squad_user');
+    if (!loggedInUser) {
+        window.location.href = "index.html";
+    }
+
+    // Detekce návštěvy
+    const isGuest = loggedInUser.startsWith("Návštěva:");
+
+    const lide = ["Hetik", "Fajt", "Simon", "TobySS"];
+    const ukoly = ["Obývák", "Koupelna", "Záchod", "Kuchyň"];
+    let dluhy = { "Hetik": 0, "Fajt": 0, "Simon": 0, "TobySS": 0 };
+
+    function shuffle(array) {
+        let currentIndex = array.length, randomIndex;
+        while (currentIndex != 0) {
+            randomIndex = Math.floor(Math.random() * currentIndex);
+            currentIndex--;
+            [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+        }
+        return array;
+    }
+
+    function renderDluhy() {
+        const tbody = document.getElementById("dluhy-body");
+        tbody.innerHTML = "";
+        // Opraveno řazení, které bylo v předchozím kódu rozbité
+        let serazeneDluhy = lide.map(jmeno => ({ jmeno: jmeno, castka: dluhy[jmeno] })).sort((a, b) => b.castka - a.castka);
+
+        serazeneDluhy.forEach((osoba, index) => {
+            let ikona = (index === 0 && osoba.castka > 0) ? " 💀" : "";
+            let tr = document.createElement("tr");
+            tr.innerHTML = `<td>${osoba.jmeno}${ikona}</td><td>${osoba.castka} Kč</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function loadData() {
+        // Skrytí prvků pro návštěvu
+        if (isGuest) {
+            document.getElementById("guest-hide-report").style.display = "none";
+            document.getElementById("btn-spin").style.display = "none";
+        }
+
+        try {
+            const response = await fetch(SCRIPT_URL + "?t=" + new Date().getTime());
+            const data = await response.json();
+            
+            lide.forEach(clovek => { if(data.dluhy[clovek] !== undefined) dluhy[clovek] = data.dluhy[clovek]; });
+            renderDluhy(); 
+
+            const tbodyRozpis = document.getElementById("rozpis-body");
+            tbodyRozpis.innerHTML = "";
+            if(data.rozpis && data.rozpis.length > 0) {
+                document.getElementById("rozpis-table").style.display = "table";
+                data.rozpis.forEach(row => {
+                    if(row.jmeno && row.ukol) {
+                        let tr = document.createElement("tr");
+                        let ukolTrida = row.hotovo ? "done-text" : "";
+                        
+                        let btnHtml = row.hotovo ? 
+                            `<span class="done-label">✔️ Hotovo</span>` : 
+                            (row.jmeno === loggedInUser ? 
+                                `<button class="action small" onclick="ukliditUkol('${row.jmeno}', this)">✔️</button>` : 
+                                `<button class="action small" disabled style="opacity: 0.4;" title="Tohle není tvůj úkol!">✔️</button>`);
+                        
+                        tr.innerHTML = `<td>${row.jmeno}</td><td class="${ukolTrida}">${row.ukol}</td><td style="text-align: center;">${btnHtml}</td>`;
+                        tbodyRozpis.appendChild(tr);
+                    }
+                });
+            }
+
+            const tbodyBordel = document.getElementById("aktivni-bordel-body");
+            tbodyBordel.innerHTML = "";
+            if(data.aktivniBordel && data.aktivniBordel.length > 0) {
+                document.getElementById("bordel-table").style.display = "table";
+                document.getElementById("zadny-bordel").style.display = "none";
+                
+                data.aktivniBordel.forEach(b => {
+                    let tr = document.createElement("tr");
+                    
+                    let btnBordel = (b.kdo === loggedInUser) ? 
+                        `<button class="action small" onclick="ukliditBordel(${b.row}, this)">🧹</button>` : 
+                        `<button class="action small" disabled style="opacity: 0.4;" title="Tohle musí uklidit ${b.kdo}!">🧹</button>`;
+                        
+                    tr.innerHTML = `
+                        <td class="nowrap">${b.kdo}</td>
+                        <td>${b.co}<div class="praskac-note">🕵️ Nahlásil: ${b.nahlasil || "Neznámý"}</div></td>
+                        <td class="nowrap">${b.pokuta} Kč</td>
+                        <td style="text-align: center;">${btnBordel}</td>
+                    `;
+                    tbodyBordel.appendChild(tr);
+                });
+            } else {
+                document.getElementById("bordel-table").style.display = "none";
+                document.getElementById("zadny-bordel").style.display = "block";
+            }
+
+            document.getElementById("btn-spin").disabled = false;
+            document.getElementById("btn-report").disabled = false;
+            document.getElementById("status-zpravy").style.display = "none";
+
+        } catch (error) {
+            document.getElementById("status-zpravy").innerText = "❌ Nepodařilo se spojit s databází.";
+        }
+    }
+
+    async function ukliditBordel(rowId, btnElement) {
+        if (isGuest) return;
+        btnElement.innerText = "⏳";
+        btnElement.disabled = true;
+        try {
+            await fetch(SCRIPT_URL, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "resolve_bordel", row: rowId }) });
+            btnElement.closest("tr").remove();
+            if(document.getElementById("aktivni-bordel-body").children.length === 0) {
+                document.getElementById("bordel-table").style.display = "none";
+                document.getElementById("zadny-bordel").style.display = "block";
+            }
+        } catch(error) { alert("❌ Chyba při uklízení!"); btnElement.innerText = "🧹"; btnElement.disabled = false; }
+    }
+
+    async function ukliditUkol(jmeno, btnElement) {
+        if (isGuest) return;
+        btnElement.innerText = "⏳";
+        btnElement.disabled = true;
+        try {
+            await fetch(SCRIPT_URL, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "resolve_ukol", jmeno: jmeno }) });
+            btnElement.closest("tr").children[1].classList.add("done-text");
+            btnElement.outerHTML = '<span class="done-label">✔️ Hotovo</span>';
+        } catch(error) { alert("❌ Chyba!"); btnElement.innerText = "✔️"; btnElement.disabled = false; }
+    }
+
+    document.getElementById("btn-spin").addEventListener("click", async () => {
+        if (isGuest) return;
+        const animaceDiv = document.getElementById("animace");
+        const table = document.getElementById("rozpis-table");
+        const tbody = document.getElementById("rozpis-body");
+        const btn = document.getElementById("btn-spin");
+        
+        table.style.display = "none"; animaceDiv.innerText = "Losuji... 🌪️"; btn.disabled = true;
+        
+        let zony = shuffle([...ukoly]);
+        let novyRozpis = lide.map((clovek, index) => ({jmeno: clovek, ukol: zony[index]}));
+
+        try {
+            await fetch(SCRIPT_URL, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "spin", rozpis: novyRozpis }) });
+            tbody.innerHTML = "";
+            novyRozpis.forEach(row => {
+                let tr = document.createElement("tr");
+                
+                let btnHtml = (row.jmeno === loggedInUser) ? 
+                    `<button class="action small" onclick="ukliditUkol('${row.jmeno}', this)">✔️</button>` : 
+                    `<button class="action small" disabled style="opacity: 0.4;" title="Tohle není tvůj úkol!">✔️</button>`;
+                    
+                tr.innerHTML = `<td>${row.jmeno}</td><td>${row.ukol}</td><td style="text-align: center;">${btnHtml}</td>`;
+                tbody.appendChild(tr);
+            });
+            animaceDiv.innerText = "Úkoly rozdány! ⚔️"; table.style.display = "table";
+        } catch (error) { animaceDiv.innerText = "❌ Chyba při ukládání!"; } finally { btn.disabled = false; }
+    });
+
+    async function nahlasitBordel() {
+        if (isGuest) return;
+        const kdo = document.getElementById("bordel-kdo").value;
+        const co = document.getElementById("bordel-co").value;
+        const pokuta = parseInt(document.getElementById("bordel-pokuta").value);
+        const nahlasil = loggedInUser; 
+
+        if(!co || isNaN(pokuta)) return alert("Vyplň co udělal a platnou částku pokuty!");
+
+        const btn = document.getElementById("btn-report");
+        btn.innerText = "Zapisuji... ⏳"; btn.disabled = true;
+
+        try {
+            await fetch(SCRIPT_URL, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "report", kdo: kdo, co: co, pokuta: pokuta, nahlasil: nahlasil }) });
+            dluhy[kdo] += pokuta;
+            alert(`🚨 Úspěšně jsi nabonzoval(a) ${kdo}. Ten dluží dalších ${pokuta} Kč za: ${co}.`);
+            location.reload(); 
+        } catch (error) { alert("❌ Chyba při ukládání."); btn.innerText = "Udělit pokutu!"; btn.disabled = false; }
+    }
+
+    document.addEventListener("DOMContentLoaded", loadData);
+</script>
+</body>
+</html>
